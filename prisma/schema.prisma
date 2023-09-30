@@ -1,0 +1,369 @@
+generator client {
+    provider = "prisma-client-js"
+}
+
+datasource db {
+    provider = "mysql"
+    url      = env("DATABASE_URL")
+}
+
+model Account {
+    id                String  @id @default(cuid())
+    userId            String
+    type              String
+    provider          String
+    providerAccountId String
+    refresh_token     String? @db.Text
+    access_token      String? @db.Text
+    expires_at        Int?
+    token_type        String?
+    scope             String?
+    id_token          String? @db.Text
+    session_state     String?
+    user              User    @relation(fields: [userId], references: [id])
+
+    @@unique([provider, providerAccountId])
+}
+
+model Session {
+    id           String   @id @default(cuid())
+    sessionToken String   @unique
+    userId       String
+    expires      DateTime
+    user         User     @relation(fields: [userId], references: [id])
+}
+
+model VerificationToken {
+    identifier String
+    token      String   @unique
+    expires    DateTime
+
+    @@unique([identifier, token])
+}
+
+model User {
+    id                  String              @id @default(cuid())
+    name                String?
+    email               String?             @unique
+    emailVerified       DateTime?
+    image               String?
+    description         String?             @db.LongText
+    phone               String?
+    address             String?
+    createdAt           DateTime            @default(now())
+    updatedAt           DateTime            @updatedAt
+    accounts            Account[]
+    sessions            Session[]
+    services            Service[]
+    serviceOrders       OrderService[]
+    serviceReviews      ReviewService[]
+    favoriteServices    FavoriteService[]
+    listDoReview        ReviewUser[]        @relation(name: "user-do-review")
+    listBeReviewed      ReviewUser[]        @relation(name: "user-be-reviewed")
+    jobs                Job[]
+    savedJobs           SavedJob[]
+    bidJobs             BidJob[]
+    contests            Contest[]
+    savedContests       SavedContest[]
+    constestProducts    ProductContest[]
+    jobOrders           OrderJob[]
+    contestOrders       OrderContest[]
+    sendTransactions    Transaction[]       @relation(name: "sender-transaction")
+    receiveTransactions Transaction[]       @relation(name: "receiver-transaction")
+    freelancerProfiles  FreelancerProfile[]
+}
+
+model FreelancerProfile {
+    id           String       @id @default(cuid())
+    freelancerId String
+    categoryId   String
+    title        String
+    active       Boolean      @default(false)
+    description  String       @db.LongText
+    skills       String?      @db.LongText
+    freelancer   User         @relation(fields: [freelancerId], references: [id])
+    category     Category     @relation(fields: [categoryId], references: [id])
+    employments  Employment[]
+    educations   Education[]
+    portfolios   Portfolio[]
+    createdAt    DateTime     @default(now())
+    updatedAt    DateTime     @updatedAt
+}
+
+model Portfolio {
+    id          String            @id @default(cuid())
+    profileId   String
+    title       String
+    gallery     String?           @db.LongText
+    videoUrl    String?
+    skills      String?           @db.LongText
+    projectUrl  String?
+    description String            @db.LongText
+    profile     FreelancerProfile @relation(fields: [profileId], references: [id])
+    createdAt   DateTime          @default(now())
+    updatedAt   DateTime          @updatedAt
+}
+
+model Employment {
+    id          String            @id @default(cuid())
+    profileId   String
+    company     String
+    address     String
+    title       String
+    from        String
+    to          String?
+    description String?           @db.LongText
+    profile     FreelancerProfile @relation(fields: [profileId], references: [id])
+    createdAt   DateTime          @default(now())
+    updatedAt   DateTime          @updatedAt
+}
+
+model Education {
+    id          String            @id @default(cuid())
+    profileId   String
+    school      String
+    from        String?
+    to          String?
+    area        String?
+    description String?           @db.LongText
+    degreeId    String?
+    degree      Degree?           @relation(fields: [degreeId], references: [id])
+    profile     FreelancerProfile @relation(fields: [profileId], references: [id])
+    createdAt   DateTime          @default(now())
+    updatedAt   DateTime          @updatedAt
+}
+
+model Degree {
+    id         String      @id @default(cuid())
+    name       String
+    educations Education[]
+}
+
+enum Role {
+    CLIENT
+    FREELANCER
+}
+
+model Service {
+    id         String            @id @default(cuid())
+    name       String
+    ownerId    String
+    info       String            @db.LongText
+    price      Float
+    archived   Boolean?          @default(false)
+    categoryId String
+    orders     OrderService[]
+    favorites  FavoriteService[]
+    reviews    ReviewService[]
+    banner     String
+    gallery    String            @db.LongText
+    owner      User              @relation(fields: [ownerId], references: [id])
+    category   Category          @relation(fields: [categoryId], references: [id])
+    createdAt  DateTime          @default(now())
+    updatedAt  DateTime          @updatedAt
+}
+
+model Category {
+    id                 String              @id
+    name               String              @unique
+    services           Service[]
+    jobs               Job[]
+    contests           Contest[]
+    freelancerProfiles FreelancerProfile[]
+}
+
+model OrderService {
+    id                   String      @id @default(cuid())
+    clientId             String
+    serviceId            String
+    status               OrderStatus @default(PENDING)
+    client               User        @relation(fields: [clientId], references: [id])
+    service              Service     @relation(fields: [serviceId], references: [id])
+    createdAt            DateTime    @default(now())
+    updatedAt            DateTime    @updatedAt
+    freelancerDone       Boolean     @default(false)
+    canceler             Role?
+    reviewServiceDone    Boolean?    @default(false)
+    reviewFreelancerDone Boolean?    @default(false)
+    reviewClientDone     Boolean?    @default(false)
+}
+
+enum OrderStatus {
+    PENDING
+    REJECTED
+    APPROVED
+    DOING
+    CANCELED
+    COMPLETED
+}
+
+model ReviewService {
+    rating     Float
+    comment    String
+    reviewerId String
+    serviceId  String
+    createdAt  DateTime @default(now())
+    updatedAt  DateTime @updatedAt
+    reviewer   User     @relation(fields: [reviewerId], references: [id])
+    service    Service  @relation(fields: [serviceId], references: [id])
+
+    @@unique([serviceId, reviewerId])
+}
+
+model ReviewUser {
+    id               String   @id @default(cuid())
+    rating           Float
+    comment          String
+    userIdDoReview   String
+    userIdBeReviewed String
+    createdAt        DateTime @default(now())
+    updatedAt        DateTime @updatedAt
+    userDoReview     User     @relation(name: "user-do-review", fields: [userIdDoReview], references: [id])
+    userBeReviewed   User     @relation(name: "user-be-reviewed", fields: [userIdBeReviewed], references: [id])
+}
+
+model FavoriteService {
+    clientId  String
+    serviceId String
+    client    User     @relation(fields: [clientId], references: [id])
+    service   Service  @relation(fields: [serviceId], references: [id])
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@id([clientId, serviceId])
+}
+
+model Job {
+    id         String     @id @default(cuid())
+    name       String
+    ownerId    String
+    info       String     @db.LongText
+    budget     Float
+    archived   Boolean?   @default(false)
+    categoryId String
+    dayLength  Int        @default(7)
+    savedList  SavedJob[]
+    bidList    BidJob[]
+    owner      User       @relation(fields: [ownerId], references: [id])
+    category   Category   @relation(fields: [categoryId], references: [id])
+    createdAt  DateTime   @default(now())
+    updatedAt  DateTime   @updatedAt
+    orders     OrderJob[]
+}
+
+model SavedJob {
+    freelancerId String
+    jobId        String
+    freelancer   User     @relation(fields: [freelancerId], references: [id])
+    job          Job      @relation(fields: [jobId], references: [id])
+    createdAt    DateTime @default(now())
+    updatedAt    DateTime @updatedAt
+
+    @@id([freelancerId, jobId])
+}
+
+model BidJob {
+    price        Float
+    freelancerId String
+    jobId        String
+    freelancer   User     @relation(fields: [freelancerId], references: [id])
+    job          Job      @relation(fields: [jobId], references: [id])
+    createdAt    DateTime @default(now())
+    updatedAt    DateTime @updatedAt
+
+    @@id([freelancerId, jobId])
+}
+
+model Contest {
+    id         String           @id @default(cuid())
+    name       String
+    ownerId    String
+    info       String           @db.LongText
+    budget     Float
+    archived   Boolean?         @default(false)
+    dueDate    String?
+    categoryId String
+    savedList  SavedContest[]
+    owner      User             @relation(fields: [ownerId], references: [id])
+    category   Category         @relation(fields: [categoryId], references: [id])
+    createdAt  DateTime         @default(now())
+    updatedAt  DateTime         @updatedAt
+    products   ProductContest[]
+    orders     OrderContest[]
+}
+
+model SavedContest {
+    freelancerId String
+    contestId    String
+    freelancer   User     @relation(fields: [freelancerId], references: [id])
+    contest      Contest  @relation(fields: [contestId], references: [id])
+    createdAt    DateTime @default(now())
+    updatedAt    DateTime @updatedAt
+
+    @@id([freelancerId, contestId])
+}
+
+model ProductContest {
+    id           String   @id @default(cuid())
+    freelancerId String
+    contestId    String
+    freelancer   User     @relation(fields: [freelancerId], references: [id])
+    contest      Contest  @relation(fields: [contestId], references: [id])
+    gallery      String?  @db.LongText
+    url          String?
+    createdAt    DateTime @default(now())
+    updatedAt    DateTime @updatedAt
+}
+
+model OrderJob {
+    id                   String      @id @default(cuid())
+    freelancerId         String
+    jobId                String
+    price                Float
+    freelancerDone       Boolean     @default(false)
+    status               OrderStatus @default(DOING)
+    canceler             Role?
+    reviewFreelancerDone Boolean?    @default(false)
+    reviewClientDone     Boolean?    @default(false)
+    freelancer           User        @relation(fields: [freelancerId], references: [id])
+    job                  Job         @relation(fields: [jobId], references: [id])
+    createdAt            DateTime    @default(now())
+    updatedAt            DateTime    @updatedAt
+}
+
+model OrderContest {
+    id                   String      @id @default(cuid())
+    freelancerId         String
+    contestId            String
+    gallery              String?     @db.LongText
+    url                  String?
+    status               OrderStatus @default(DOING)
+    freelancer           User        @relation(fields: [freelancerId], references: [id])
+    contest              Contest     @relation(fields: [contestId], references: [id])
+    freelancerDone       Boolean     @default(false)
+    canceler             Role?
+    reviewFreelancerDone Boolean?    @default(false)
+    reviewClientDone     Boolean?    @default(false)
+    createdAt            DateTime    @default(now())
+    updatedAt            DateTime    @updatedAt
+}
+
+model Transaction {
+    id         String               @id @default(cuid())
+    orderId    String
+    type       TransactionOrderType
+    senderId   String
+    receiverId String
+    amount     Float
+    createdAt  DateTime             @default(now())
+    updatedAt  DateTime             @updatedAt
+    sender     User                 @relation(name: "sender-transaction", fields: [senderId], references: [id])
+    receiver   User                 @relation(name: "receiver-transaction", fields: [receiverId], references: [id])
+    done       Boolean              @default(false)
+}
+
+enum TransactionOrderType {
+    JOB
+    SERVICE
+    CONTEST
+}
